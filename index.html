@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>맞춤형 수학 학습 웹앱</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- KaTeX for Math Rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  
+  <!-- html2pdf.js for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    .custom-scrollbar::-webkit-scrollbar { height: 8px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    .animate-fade-in {
+      animation: fadeIn 0.3s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col font-sans">
+
+  <!-- 1. 로그인 / 진입 화면 -->
+  <div id="login-screen" class="flex-1 flex items-center justify-center p-4">
+    <form id="login-form" class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md space-y-6">
+      <div class="flex justify-center text-blue-600 mb-2">
+        <i class="fa-solid fa-book-open text-6xl"></i>
+      </div>
+      <h1 class="text-2xl font-bold text-center text-gray-800">맞춤형 수학 학습</h1>
+      <p class="text-center text-gray-500">학번과 이름을 입력하고 학습을 시작하세요.</p>
+      
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-600 mb-1">학번</label>
+          <input type="text" id="student-id" placeholder="예: 10101" required
+            class="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-400 text-lg">
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-600 mb-1">이름</label>
+          <input type="text" id="student-name" placeholder="예: 홍길동" required
+            class="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-400 text-lg">
+        </div>
+      </div>
+      
+      <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-lg transition-colors text-lg shadow">
+        학습 시작하기
+      </button>
+    </form>
+  </div>
+
+  <!-- 2. 메인 학습 화면 (초기 숨김) -->
+  <div id="main-screen" class="hidden flex-1 flex flex-col h-screen">
+    <!-- 상단 네비게이션 바 -->
+    <header class="bg-white shadow-md flex items-center justify-between px-4 py-3 shrink-0">
+      <div id="nav-buttons-container" class="flex space-x-2 overflow-x-auto flex-1 mr-4 pb-1 custom-scrollbar">
+        <!-- 1~16번 버튼 동적 생성 -->
+      </div>
+      <button id="exit-btn" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg font-bold transition shadow-md flex items-center space-x-2">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span>학습 완료 및 나가기</span>
+      </button>
+    </header>
+
+    <!-- 중앙 콘텐츠 영역 -->
+    <main class="flex-1 overflow-y-auto p-6 flex justify-center">
+      <div class="max-w-3xl w-full space-y-6 pb-20">
+        
+        <!-- 문제 카드 -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+          <h2 class="text-2xl font-extrabold text-gray-800 mb-6 flex items-center">
+            <span id="problem-badge" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg mr-3 text-lg">문제 1</span>
+            <span id="problem-title">합의 기호의 뜻과 성질 1</span>
+          </h2>
+          <div id="problem-content" class="text-xl text-gray-700 leading-loose break-keep">
+            <!-- 수식 렌더링 영역 -->
+          </div>
+        </div>
+
+        <!-- 난이도 선택 피드백 -->
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <h3 class="text-lg font-bold text-gray-700 mb-4">이 문제의 난이도는 어땠나요? 수준에 맞는 학습을 제공합니다.</h3>
+          <div class="flex flex-col sm:flex-row gap-3">
+            <button onclick="selectDifficulty('hard')" id="btn-diff-hard" class="flex-1 py-3 px-4 rounded-xl border-2 font-bold transition-all text-center text-red-500 border-red-200 hover:bg-red-50">
+              어려움 (단계별 풀이)
+            </button>
+            <button onclick="selectDifficulty('normal')" id="btn-diff-normal" class="flex-1 py-3 px-4 rounded-xl border-2 font-bold transition-all text-center text-green-600 border-green-200 hover:bg-green-50">
+              보통 (빈칸 채우기)
+            </button>
+            <button onclick="selectDifficulty('easy')" id="btn-diff-easy" class="flex-1 py-3 px-4 rounded-xl border-2 font-bold transition-all text-center text-yellow-600 border-yellow-200 hover:bg-yellow-50">
+              쉬움 (핵심 서술)
+            </button>
+          </div>
+        </div>
+
+        <!-- 동적 렌더링 학습 카드 -->
+        <div id="learning-card-container" class="hidden">
+          <!-- Hard / Normal / Easy 가 템플릿 형태로 주입됨 -->
+        </div>
+        
+      </div>
+    </main>
+  </div>
+
+  <!-- 3. 결과 보고서 화면 (초기 숨김) -->
+  <div id="report-screen" class="hidden min-h-screen bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto mb-6 flex justify-between items-center">
+      <button id="back-to-study-btn" class="px-5 py-2.5 bg-gray-300 rounded-lg hover:bg-gray-400 transition font-bold text-gray-800 shadow">
+        <i class="fa-solid fa-arrow-left mr-2"></i>학습으로 돌아가기
+      </button>
+      <button id="download-pdf-btn" class="flex items-center space-x-2 px-6 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-bold shadow-lg">
+        <i class="fa-solid fa-file-pdf"></i>
+        <span>PDF로 저장하기</span>
+      </button>
+    </div>
+    
+    <!-- PDF 인쇄용 컨테이너 -->
+    <div id="report-container" class="max-w-4xl mx-auto bg-white p-10 rounded-xl shadow-lg text-black">
+      <h1 class="text-3xl font-extrabold text-center mb-8 text-gray-800 border-b pb-4">학생 맞춤 학습 결과 보고서</h1>
+      <div class="flex justify-between items-end mb-6 text-lg font-semibold text-gray-700">
+        <div><span class="text-gray-400 text-base">학번 :</span> <span id="report-student-id"></span></div>
+        <div><span class="text-gray-400 text-base">이름 :</span> <span id="report-student-name"></span></div>
+      </div>
+      <table class="w-full border-collapse">
+        <thead>
+          <tr class="bg-gray-800 text-white text-left">
+            <th class="p-4 border border-gray-700 rounded-tl-lg text-center w-24">문제 번호</th>
+            <th class="p-4 border border-gray-700 text-center w-28">학습 여부</th>
+            <th class="p-4 border border-gray-700 text-center w-36">선택 난이도</th>
+            <th class="p-4 border border-gray-700 rounded-tr-lg">학습 내용 및 코멘트</th>
+          </tr>
+        </thead>
+        <tbody id="report-table-body">
+          <!-- 동적 리스트 주입 -->
+        </tbody>
+      </table>
+      <div class="mt-8 text-center text-gray-400 text-sm">
+        본 보고서는 맞춤형 수학 학습 웹앱을 통해 작성되었습니다.
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript 애플리케이션 핵심 로직 -->
+  <script>
+    // --- 수식 렌더링 도우미 ---
+    function renderMathText(text) {
+      if (!text) return '';
+      // $$수식$$ 치환
+      let rendered = text.replace(/\$\$(.*?)\$\$/g, function(match, math) {
+        try { return katex.renderToString(math, { displayMode: true, throwOnError: false }); } 
+        catch (e) { return match; }
+      });
+      // $수식$ 치환
+      rendered = rendered.replace(/\$(.*?)\$/g, function(match, math) {
+        try { return katex.renderToString(math, { displayMode: false, throwOnError: false }); } 
+        catch (e) { return match; }
+      });
+      return rendered;
+    }
+
+    const easyQuestionText = "이 문제를 해결하기 위해 어떤 개념을 사용했으며, 그 개념을 사용하기로 판단한 이유는 무엇인가요?";
+
+    // --- 문제 데이터베이스 (1-16) ---
+    const problems = [
+      {
+        id: 1,
+        title: "합의 기호의 뜻과 성질 1",
+        content: "$\\sum_{k=1}^{20}a_{k}=10$, $\\sum_{k=1}^{20}b_{k}=20$ 일 때, 다음 식의 값을 구하시오.<br/>(1) $\\sum_{k=1}^{20}(2a_{k}+b_{k})$<br/>(2) $\\sum_{k=1}^{20}(a_{k}-2b_{k}+3)$",
+        hard: [
+          "합의 기호의 성질 $\\sum(ca_k + b_k) = c\\sum a_k + \\sum b_k$를 이용해 식을 분리합니다.",
+          "(1)은 $2\\sum a_k + \\sum b_k$로 변형되어 $2 \\times 10 + 20 = 40$입니다.",
+          "상수항의 합 $\\sum_{k=1}^n c = cn$ 성질을 이용합니다.",
+          "(2)는 $\\sum a_k - 2\\sum b_k + \\sum 3$으로 변형되어 $10 - 2 \\times 20 + 3 \\times 20 = 30$입니다."
+        ],
+        normal: [
+          { step: "합의 기호의 성질을 이용해 식을 분리합니다.", answers: [] },
+          { step: "(1)은 $2\\sum a_k + \\sum b_k$로 변형되어 $2 \\times$ [ ] $+ 20 = 40$입니다.", answers: ["10"] },
+          { step: "상수항의 합 $\\sum_{k=1}^n c =$ [ ] 성질을 이용합니다.", answers: ["cn"] },
+          { step: "(2)는 $\\sum a_k - 2\\sum b_k + \\sum 3$으로 변형되어 $10 - 2 \\times 20 +$ [ ] $= 30$입니다.", answers: ["60"] }
+        ],
+        easySkip: true,
+        easy: easyQuestionText
+      },
+      {
+        id: 2,
+        title: "여러 가지 수열의 합 1",
+        content: "다음 식의 값을 구하시오.<br/>(1) $\\sum_{k=1}^{16}k(k+4)$<br/>(2) $\\sum_{k=1}^{10}(k-1)(k^{2}+k+1)$",
+        hard: [
+          "(1) 전개하면 $k^2+4k$ 입니다.",
+          "$\\sum k^2$과 $\\sum k$ 공식을 대입하여 계산합니다.",
+          "(2) $(k-1)(k^2+k+1)$을 곱셈 공식을 이용해 전개하면 $k^3-1$ 입니다.",
+          "$\\sum k^3$ 공식과 상수항의 합을 계산하여 뺍니다."
+        ],
+        normal: [
+          { step: "(1) 전개하면 $k^2 +$ [ ] $k$ 입니다.", answers: ["4"] },
+          { step: "$\\sum k^2$과 $\\sum k$ 공식을 대입하여 계산합니다.", answers: [] },
+          { step: "(2) $(k-1)(k^2+k+1)$을 곱셈 공식을 이용해 전개하면 $k^3 -$ [ ] 입니다.", answers: ["1"] },
+          { step: "$\\sum k^3$ 공식과 상수항의 합을 계산하여 뺍니다.", answers: [] }
+        ],
+        easySkip: true,
+        easy: easyQuestionText
+      },
+      {
+        id: 3,
+        title: "수열의 귀납적 정의",
+        content: "다음과 같이 귀납적으로 정의된 수열 $\\{a_{n}\\}$ 에서 $a_{3}$을 구하시오.<br/>(1) $a_{1}=3, a_{n+1}-a_{n}=-2$<br/>(2) $a_{1}=2, a_{n+1}=5a_{n}$<br/>(3) $a_{1}=-2, a_{n+1}=2a_{n}+3$",
+        hard: [
+          "(1) 공차가 -2인 등차수열입니다. $a_2=1, a_3=-1$입니다.",
+          "(2) 공비가 5인 등비수열입니다. $a_2=10, a_3=50$입니다.",
+          "(3) n=1을 대입하면 $a_2=2(-2)+3=-1$이고, n=2를 대입하면 $a_3=2(-1)+3=1$입니다."
+        ],
+        normal: [
+          { step: "(1) 공차가 [ ]인 등차수열입니다. $a_2=1, a_3=-1$입니다.", answers: ["-2"] },
+          { step: "(2) 공비가 [ ]인 등비수열입니다. $a_2=10, a_3=50$입니다.", answers: ["5"] },
+          { step: "(3) n=1을 대입하면 $a_2=2(-2)+3=$ [ ]이고, n=2를 대입하면 $a_3=2(-1)+3=1$입니다.", answers: ["-1"] }
+        ],
+        easySkip: true,
+        easy: easyQuestionText
+      },
+      {
+        id: 4,
+        title: "합의 기호의 뜻과 성질 2",
+        content: "$\\sum_{k=1}^{10}a_{k}=15$, $\\sum_{k=1}^{10}{a_{k}}^{2}=40$ 일 때, $\\sum_{k=1}^{10}(a_{k}+2)^{2}$의 값을 구하시오.",
+        hard: [
+          "$(a_k+2)^2$을 전개하면 $a_k^2 + 4a_k + 4$가 됩니다.",
+          "합의 기호 성질에 의해 $\\sum a_k^2 + 4\\sum a_k + \\sum 4$ 로 나눌 수 있습니다.",
+          "주어진 값을 대입하면 $40 + 4 \\times 15 + 4 \\times 10$ 입니다.",
+          "계산하면 $40 + 60 + 40 = 140$이 됩니다."
+        ],
+        normal: [
+          { step: "$(a_k+2)^2$을 전개하면 $a_k^2 + 4a_k +$ [ ] 가 됩니다.", answers: ["4"] },
+          { step: "합의 기호 성질에 의해 $\\sum a_k^2 + 4\\sum a_k + \\sum$ [ ] 로 나눌 수 있습니다.", answers: ["4"] },
+          { step: "주어진 값을 대입하면 $40 + 4 \\times 15 + 4 \\times$ [ ] 입니다.", answers: ["10"] },
+          { step: "계산하면 $40 + 60 + 40 =$ [ ] 이 됩니다.", answers: ["140"] }
+        ],
+        easySkip: false,
+        easy: easyQuestionText
+      },
+      {
+        id: 5,
+        title: "합의 기호의 뜻과 성질 3",
+        content: "수열 $\\{a_{n}\\}$ 에 대하여 $a_{n}=2^{n-1}$ 일 때, $\\sum_{k=1}^{16}a_{2k}$ 의 값을 구하시오.",
+        hard: [
+          "$a_{2k}$를 구하기 위해 n 대신 2k를 대입하면 $a_{2k} = 2^{2k-1}$ 입니다.",
+          "$2^{2k-1} = \\frac{1}{2} \\times 4^k$ 이므로, 이 수열은 첫째항이 2, 공비가 4인 등비수열입니다.",
+          "등비수열의 합 공식을 적용하면 $\\frac{2(4^{16}-1)}{4-1}$ 입니다.",
+          "정리하면 $\\frac{2}{3}(2^{32}-1)$ 입니다."
+        ],
+        normal: [
+          { step: "$a_{2k}$를 구하기 위해 n 대신 2k를 대입하면 $a_{2k} = 2^{2k-1}$ 입니다.", answers: [] },
+          { step: "$2^{2k-1} = \\frac{1}{2} \\times A^k$ 꼴로 나타낼 때 $A =$ [ ] 이므로, 이 수열은 첫째항이 2, 공비가 [ ]인 등비수열입니다.", answers: ["4", "4"] },
+          { step: "등비수열의 합 공식을 적용하면 $\\frac{2(4^{16}-1)}{4-1}$ 입니다.", answers: [] },
+          { step: "정리하면 $\\frac{A}{3}(2^{32}-1)$ 형태가 됩니다. 이때 분자 $A =$ [ ] 입니다.", answers: ["2"] }
+        ],
+        easySkip: false,
+        easy: easyQuestionText
+      },
+      {
+        id: 6,
+        title: "여러 가지 수열의 합 2",
+        content: "$\\sum_{k=1}^{n}\\{\\sum_{m=1}^{k}(2m-k)\\} = 78$을 만족시키는 자연수 n의 값을 구하시오.",
+        hard: [
+          "안쪽 시그마 $\\sum_{m=1}^k (2m-k)$ 에서 변수는 m이고 k는 상수 취급합니다.",
+          "계산하면 $2 \\times \\frac{k(k+1)}{2} - k \\times k = k(k+1) - k^2 = k$ 가 됩니다.",
+          "바깥쪽 시그마 $\\sum_{k=1}^n k = \\frac{n(n+1)}{2}$ 가 78이 되어야 합니다.",
+          "$n(n+1) = 156$ 이므로 $12 \\times 13 = 156$에서 $n=12$ 입니다."
+        ],
+        normal: [
+          { step: "안쪽 시그마 $\\sum_{m=1}^k (2m-k)$ 에서 변수는 [ ]이고 k는 상수 취급합니다.", answers: ["m"] },
+          { step: "계산하면 $2 \\times \\frac{k(k+1)}{2} - k \\times k = k(k+1) - k^2 =$ [ ] 가 됩니다.", answers: ["k"] },
+          { step: "바깥쪽 시그마 $\\sum_{k=1}^n k = \\frac{n(n+1)}{2}$ 가 [ ]이(가) 되어야 합니다.", answers: ["78"] },
+          { step: "$n(n+1) =$ [ ] 이므로 $12 \\times 13 = 156$에서 n=12 입니다.", answers: ["156"] }
+        ],
+        easySkip: false,
+        easy: easyQuestionText
+      },
+      {
+        id: 7,
+        title: "수열의 귀납적 정의 2",
+        content: "수열 $\\{a_{n}\\}$ 이 $a_{1}=2$이고, <br/> $a_{n+1} = 2a_{n}$ (n이 홀수), <br/> $a_{n+1} = a_{n}+3$ (n이 짝수) <br/> 일 때, $a_{6}$을 구하시오.",
+        hard: [
+          "n=1(홀수)일 때, $a_2 = 2 \\times a_1 = 4$ 입니다.",
+          "n=2(짝수)일 때, $a_3 = a_2 + 3 = 7$ 입니다.",
+          "n=3(홀수)일 때, $a_4 = 2 \\times a_3 = 14$ 입니다.",
+          "n=4(짝수)일 때 $a_5 = 17$, n=5(홀수)일 때 $a_6 = 34$ 가 됩니다."
+        ],
+        normal: [
+          { step: "n=1(홀수)일 때, $a_2 = 2 \\times a_1 =$ [ ] 입니다.", answers: ["4"] },
+          { step: "n=2(짝수)일 때, $a_3 = a_2 + 3 =$ [ ] 입니다.", answers: ["7"] },
+          { step: "n=3(홀수)일 때, $a_4 = 2 \\times a_3 =$ [ ] 입니다.", answers: ["14"] },
+          { step: "n=4(짝수)일 때 $a_5 = 17$, n=5(홀수)일 때 $a_6 =$ [ ] 가 됩니다.", answers: ["34"] }
+        ],
+        easySkip: false,
+        easy: easyQuestionText
+      },
+      {
+        id: 8,
+        title: "수열의 귀납적 정의 3",
+        content: "$a_{1}=5$, $a_{n+1}=\\frac{1}{2}a_{n}-1$, 모든 자연수 n에 대하여 $a_{n+4}=a_{n}$일 때, $\\sum_{k=1}^{32}a_{k}$의 값을 구하시오.",
+        hard: [
+          "주어진 점화식으로 항을 구하면 $a_1=5$, $a_2=\\frac{3}{2}$, $a_3=-\\frac{1}{4}$, $a_4=-\\frac{9}{8}$ 입니다.",
+          "$a_{n+4}=a_n$이므로 이 수열은 주기가 4인 수열입니다.",
+          "한 주기(4개 항)의 합은 $5 + \\frac{3}{2} - \\frac{1}{4} - \\frac{9}{8} = \\frac{41}{8}$ 입니다.",
+          "$\\sum_{k=1}^{32}$는 4개 묶음이 8번 반복되므로 $8 \\times \\frac{41}{8} = 41$ 입니다."
+        ],
+        normal: [
+          { step: "주어진 점화식으로 항을 구하면 $a_1=5$, $a_2=\\frac{3}{2}$, $a_3=-\\frac{1}{4}$, $a_4=-\\frac{9}{8}$ 입니다.", answers: [] },
+          { step: "$a_{n+4}=a_n$이므로 이 수열은 주기가 [ ]인 수열입니다.", answers: ["4"] },
+          { step: "한 주기(4개 항)의 합은 $5 + \\frac{3}{2} - \\frac{1}{4} - \\frac{9}{8} = \\frac{41}{8}$ 입니다.", answers: [] },
+          { step: "$\\sum_{k=1}^{32}$는 4개 묶음이 [ ]번 반복되므로 [ ] $\\times \\frac{41}{8} = 41$ 입니다.", answers: ["8", "8"] }
+        ],
+        easySkip: false,
+        easy: easyQuestionText
+      },
+      {
+        id: 9,
+        title: "수학적 귀납법 1",
+        content: "모든 자연수 n에 대하여 $4^n-1$은 3의 배수임을 수학적 귀납법으로 증명하시오.",
+        hard: [
+          "n=1일 때, $4^1-1=3$이므로 3의 배수가 성립합니다.",
+          "n=k일 때 성립한다고 가정하면, $4^k-1=3m$ (m은 자연수)이므로 $4^k = 3m+1$ 입니다.",
+          "n=k+1일 때, $4^{k+1}-1 = 4 \\times 4^k - 1 = 4(3m+1) - 1 = 12m + 3$ 입니다.",
+          "$12m + 3 = 3(4m+1)$이므로 3의 배수임이 증명됩니다."
+        ],
+        normal: [
+          { step: "n=1일 때, $4^1-1=3$이므로 3의 배수가 성립합니다.", answers: [] },
+          { step: "n=k일 때 성립한다고 가정하면, $4^k-1=3m$ (m은 자연수)이므로 $4^k = 3m+$ [ ] 입니다.", answers: ["1"] },
+          { step: "n=k+1일 때, $4^{k+1}-1 = 4 \\times 4^k - 1 = 4($ [ ] $) - 1 = 12m + 3$ 입니다.", answers: ["3m+1"] },
+          { step: "$12m + 3 = 3($ [ ] $)$이므로 3의 배수임이 증명됩니다.", answers: ["4m+1"] }
+        ],
+        easySkip: false,
+        easy: easyQuestionText
+      },
+      {
+        id: 10,
+        title: "여러 가지 수열의 합 3",
+        content: "수열 $\\{a_{n}\\}$ 의 첫째항부터 제 n항까지의 합 $S_n$이 $S_{n}=n^{2}+2n$ 일 때, $\\sum_{k=1}^{10}\\frac{1}{a_{k}a_{k+1}}$ 의 값을 구하시오.",
+        hard: [
+          "$a_n = S_n - S_{n-1} (n \\ge 2)$를 이용하면 $a_n = 2n+1$ 입니다.",
+          "구하는 식은 $\\sum_{k=1}^{10} \\frac{1}{(2k+1)(2k+3)}$ 입니다.",
+          "부분분수 분해를 이용하면 $\\frac{1}{2}(\\frac{1}{2k+1} - \\frac{1}{2k+3})$ 이 됩니다.",
+          "축차대입하여 소거하면 $\\frac{1}{2}(\\frac{1}{3} - \\frac{1}{23}) = \\frac{10}{69}$ 입니다."
+        ],
+        normal: [
+          { step: "$a_n = S_n - S_{n-1} (n \\ge 2)$를 이용하면 $a_n =$ [ ]n + 1 입니다.", answers: ["2"] },
+          { step: "구하는 식은 $\\sum_{k=1}^{10} \\frac{1}{(2k+1)(2k+3)}$ 입니다.", answers: [] },
+          { step: "부분분수 분해를 이용하면 앞에 상수가 곱해져 $\\frac{1}{A}(\\frac{1}{2k+1} - \\frac{1}{2k+3})$ 이 됩니다. $A =$ [ ] 입니다.", answers: ["2"] },
+          { step: "축차대입하여 소거하고 계산하면 결과는 $\\frac{10}{A}$ 이 됩니다. $A =$ [ ] 입니다.", answers: ["69"] }
+        ],
+        easySkip: false,
+        easy: easyQuestionText
+      },
+      {
+        id: 11,
+        title: "수열의 귀납적 정의 4",
+        content: "한 변의 길이가 1인 정삼각형 모양의 종이가 있다. 각 변의 중점을 이어 가운데 정삼각형을 오려내는 과정을 반복한다. n단계에서 남아 있는 종이의 넓이를 $a_n$이라고 할 때, $4a_5$를 구하시오.",
+        hard: [
+          "처음 정삼각형의 넓이는 $S = \\frac{\\sqrt{3}}{4} \\times 1^2 = \\frac{\\sqrt{3}}{4}$ 입니다.",
+          "매 단계마다 넓이가 $\\frac{3}{4}$ 배가 되므로 $a_{n+1} = \\frac{3}{4}a_n$ 인 등비수열입니다.",
+          "$a_1 = S \\times \\frac{3}{4} = \\frac{3\\sqrt{3}}{16}$ 입니다. 일반항 $a_n = \\frac{3\\sqrt{3}}{16}(\\frac{3}{4})^{n-1}$",
+          "$a_5 = \\frac{3\\sqrt{3}}{16}(\\frac{3}{4})^4$ 이고 $4a_5 = \\sqrt{3}(\\frac{3}{4})^5$ 입니다."
+        ],
+        normal: [
+          { step: "처음 정삼각형의 넓이는 $S = \\frac{\\sqrt{A}}{4} \\times 1^2$ 입니다. $A =$ [ ] 입니다.", answers: ["3"] },
+          { step: "매 단계마다 넓이가 $\\frac{A}{4}$ 배가 되므로 $A =$ [ ] 이고, $a_{n+1} = \\frac{3}{4}a_n$ 인 등비수열입니다.", answers: ["3"] },
+          { step: "$a_1 = S \\times \\frac{3}{4} = \\frac{3\\sqrt{3}}{16}$ 입니다. 일반항 $a_n = \\frac{3\\sqrt{3}}{16}(\\frac{3}{4})^{n-1}$", answers: [] },
+          { step: "$a_5 = \\frac{3\\sqrt{3}}{16}(\\frac{3}{4})^4$ 이고 식을 변형하면 $4a_5 = \\sqrt{3}(\\frac{A}{4})^5$ 가 됩니다. $A =$ [ ] 입니다.", answers: ["3"] }
+        ],
+        easySkip: false,
+        easy: easyQuestionText
+      },
+      {
+        id: 12,
+        title: "수학적 귀납법 2",
+        content: "자연수 n에 대한 명제 p(n)이 n=1일 때 참이고, 만약 p(n)이 참이면 p(n+2)도 참이다. 명제 p(n)이 모든 자연수 n에 대하여 참이 되기 위한 필요충분조건을 구하시오.",
+        hard: [
+          "p(1)이 참이면 p(3), p(5), p(7)... 등 모든 홀수에 대하여 참이 됩니다.",
+          "하지만 모든 자연수에 대하여 참이 되려면 짝수인 경우도 참이어야 합니다.",
+          "p(n) -> p(n+2) 규칙에 의해 짝수들이 참이 되려면 시작점이 필요합니다.",
+          "따라서 p(2)가 참이라는 조건이 추가되면 p(4), p(6)... 도 참이 되어 모든 자연수에 대해 참이 됩니다."
+        ],
+        normal: [
+          { step: "p(1)이 참이면 p(3), p(5), p(7)... 등 모든 홀수에 대하여 참이 됩니다.", answers: [] },
+          { step: "하지만 모든 자연수에 대하여 참이 되려면 [ ]인 경우도 참이어야 합니다.", answers: ["짝수"] },
+          { step: "p(n) -> p(n+2) 규칙에 의해 짝수들이 참이 되려면 시작점이 필요합니다.", answers: [] },
+          { step: "따라서 p([ ])가 참이라는 조건이 추가되면 p(4), p(6)... 도 참이 되어 모든 자연수에 대해 참이 됩니다.", answers: ["2"] }
+        ],
+        easySkip: false,
+        easy: easyQuestionText
+      },
+      {
+        id: 13,
+        title: "여러 가지 수열의 합 4",
+        content: "다음 수열의 첫째항부터 제 n항까지의 합을 구하시오.<br/>$\\frac{1}{2}, \\frac{1}{2+4}, \\frac{1}{2+4+6}, \\dots, \\frac{1}{2+4+6+\\dots+2n}$",
+        hard: [
+          "분모의 합 $2+4+\\dots+2n = 2(1+2+\\dots+n) = 2 \\times \\frac{n(n+1)}{2} = n(n+1)$ 입니다.",
+          "따라서 일반항 $a_k = \\frac{1}{k(k+1)}$ 입니다.",
+          "$\\sum_{k=1}^n \\frac{1}{k(k+1)}$ 을 부분분수 분해하면 $\\sum (\\frac{1}{k} - \\frac{1}{k+1})$ 입니다.",
+          "연속으로 소거되어 $1 - \\frac{1}{n+1} = \\frac{n}{n+1}$ 이 남습니다."
+        ],
+        normal: [
+          { step: "분모의 합은 $2+4+\\dots+2n = 2(1+2+\\dots+n) = 2 \\times \\frac{n(n+1)}{2}$ 이며, 정리하면 $n(n+A)$ 가 됩니다. $A =$ [ ] 입니다.", answers: ["1"] },
+          { step: "따라서 일반항 $a_k = \\frac{1}{k(k+1)}$ 입니다.", answers: [] },
+          { step: "$\\sum_{k=1}^n \\frac{1}{k(k+1)}$ 을 부분분수 분해하면 $\\sum (\\frac{1}{k} - \\frac{1}{k+A})$ 입니다. $A =$ [ ] 입니다.", answers: ["1"] },
+          { step: "연속으로 소거되어 $1 - \\frac{1}{n+1} = \\frac{n}{n+A}$ 가 남습니다. $A =$ [ ] 입니다.", answers: ["1"] }
+        ],
+        easySkip: false,
+        easy: easyQuestionText
+      },
+      {
+        id: 14,
+        title: "수열의 귀납적 정의 5",
+        content: "학생 n명을 두 조로 나누는 방법의 수를 $a_n$이라고 하자. $a_n$과 $a_{n+1}$ 사이의 관계식을 구하시오. (단, $n \\ge 2$)",
+        hard: [
+          "n명을 이미 두 조로 나눈 상태(방법의 수 $a_n$)에서, 새로운 1명이 추가되는 상황을 생각합니다.",
+          "새로운 1명은 기존의 두 조 중 하나를 선택해서 들어갈 수 있으므로 $2 \\times a_n$ 가지가 있습니다.",
+          "또는 새로운 1명이 독자적인 한 조를 이루고, 기존 n명이 모두 뭉쳐서 한 조가 되는 경우가 1가지 있습니다.",
+          "따라서 관계식은 $a_{n+1} = 2a_n + 1$ 이 됩니다."
+        ],
+        normal: [
+          { step: "n명을 이미 두 조로 나눈 상태(방법의 수 $a_n$)에서, 새로운 1명이 추가되는 상황을 생각합니다.", answers: [] },
+          { step: "새로운 1명은 기존의 두 조 중 하나를 선택해서 들어갈 수 있으므로 [ ] $\\times a_n$ 가지가 있습니다.", answers: ["2"] },
+          { step: "또는 새로운 1명이 독자적인 한 조를 이루고, 기존 n명이 모두 뭉쳐서 한 조가 되는 경우가 [ ]가지 있습니다.", answers: ["1"] },
+          { step: "따라서 관계식은 $a_{n+1} = 2a_n +$ [ ] 이 됩니다.", answers: ["1"] }
+        ],
+        easySkip: false,
+        easy: easyQuestionText
+      },
+      {
+        id: 15,
+        title: "여러 가지 수열의 합 5",
+        content: "자연수 n에 대하여 이차방정식 $x^2-2nx-2n+1=0$의 두 근을 $a_n, b_n$이라고 할 때, $\\sum_{k=1}^{10}(a_k^2+b_k^2)$의 값을 구하시오.",
+        hard: [
+          "이차방정식의 근과 계수의 관계에 의해 $a_n+b_n=2n$, $a_nb_n=-2n+1$ 입니다.",
+          "$a_n^2+b_n^2 = (a_n+b_n)^2 - 2a_nb_n = (2n)^2 - 2(-2n+1) = 4n^2+4n-2$ 입니다.",
+          "$\\sum_{k=1}^{10} (4k^2+4k-2) = 4\\sum k^2 + 4\\sum k - \\sum 2$ 를 계산합니다.",
+          "$4 \\times 385 + 4 \\times 55 - 20 = 1540 + 220 - 20 = 1740$ 입니다."
+        ],
+        normal: [
+          { step: "이차방정식의 근과 계수의 관계에 의해 $a_n+b_n=$ [ ]n, $a_nb_n=-2n+$ [ ] 입니다.", answers: ["2", "1"] },
+          { step: "$a_n^2+b_n^2 = (a_n+b_n)^2 - 2a_nb_n = (2n)^2 - 2(-2n+1) = 4n^2+4n-$ [ ] 입니다.", answers: ["2"] },
+          { step: "$\\sum_{k=1}^{10} (4k^2+4k-2) = 4\\sum k^2 + 4\\sum k - \\sum$ [ ] 를 계산합니다.", answers: ["2"] },
+          { step: "$4 \\times 385 + 4 \\times 55 - 20 =$ [ ] + 220 - 20 = 1740 입니다.", answers: ["1540"] }
+        ],
+        easySkip: false,
+        easy: easyQuestionText
+      },
+      {
+        id: 16,
+        title: "수학적 귀납법 3",
+        content: "$n \\ge 2$인 모든 자연수 n에 대하여 다음 부등식이 성립함을 증명하시오.<br/>$1+\\frac{1}{2^2}+\\dots+\\frac{1}{n^2} < 2-\\frac{1}{n}$",
+        hard: [
+          "n=2일 때, 좌변은 $\\frac{5}{4}$, 우변은 $\\frac{3}{2}$ 이므로 성립합니다.",
+          "n=k일 때 $1+\\dots+\\frac{1}{k^2} < 2-\\frac{1}{k}$ 성립을 가정합니다.",
+          "양변에 $\\frac{1}{(k+1)^2}$을 더하면 좌변은 $1+\\dots+\\frac{1}{(k+1)^2} < 2-\\frac{1}{k}+\\frac{1}{(k+1)^2}$ 가 됩니다.",
+          "$(2-\\frac{1}{k+1}) - (2-\\frac{1}{k}+\\frac{1}{(k+1)^2}) = \\frac{1}{k(k+1)^2} > 0$ 이므로 증명됩니다."
+        ],
+        normal: [
+          { step: "n=2일 때, 좌변은 $\\frac{5}{4}$, 우변은 $\\frac{3}{2}$ 이므로 성립합니다.", answers: [] },
+          { step: "n=k일 때 $1+\\dots+\\frac{1}{k^2} < 2-\\frac{1}{k}$ 성립을 가정합니다.", answers: [] },
+          { step: "양변에 $\\frac{1}{(A+1)^2}$을 더한다고 할 때, 더하는 식의 변수 $A =$ [ ] 입니다. 따라서 좌변은 $1+\\dots+\\frac{1}{(k+1)^2} < 2-\\frac{1}{k}+\\frac{1}{(k+1)^2}$ 가 됩니다.", answers: ["k"] },
+          { step: "$(2-\\frac{1}{k+1}) - (2-\\frac{1}{k}+\\frac{1}{(k+1)^2}) = \\frac{1}{k(k+1)^2} > 0$ 이므로 증명됩니다.", answers: [] }
+        ],
+        easySkip: false,
+        easy: easyQuestionText
+      }
+    ];
+
+    // --- 앱 상태 관리 변수 ---
+    let studentId = '';
+    let studentName = '';
+    let currentProblemId = 1;
+    let records = {}; // [problemId]: { difficulty, isCompleted, userNote }
+    let hardStepsState = {}; // [problemId]: Array of { status: null/'know'/'dontKnow', note: '', isSubmitted: false }
+    let normalInputsState = {}; // [problemId]: Array of Arrays (빈칸 입력값들)
+
+    // --- 초기 셋업 및 이벤트 연결 ---
+    window.addEventListener('DOMContentLoaded', () => {
+      // 로그인 폼 전송
+      document.getElementById('login-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        studentId = document.getElementById('student-id').value.trim();
+        studentName = document.getElementById('student-name').value.trim();
+        if (studentId && studentName) {
+          document.getElementById('login-screen').classList.add('hidden');
+          document.getElementById('main-screen').classList.remove('hidden');
+          initApp();
+        }
+      });
+
+      // 학습완료 및 나가기 버튼
+      document.getElementById('exit-btn').addEventListener('click', () => {
+        showReport();
+      });
+
+      // 보고서에서 학습 화면으로 돌아가기
+      document.getElementById('back-to-study-btn').addEventListener('click', () => {
+        document.getElementById('report-screen').classList.add('hidden');
+        document.getElementById('main-screen').classList.remove('hidden');
+        // 네비게이션 재활성화 및 문제 렌더링 유지
+        renderNavigation();
+      });
+
+      // PDF 다운로드 버튼
+      document.getElementById('download-pdf-btn').addEventListener('click', () => {
+        downloadPdf();
+      });
+    });
+
+    // --- 메인 앱 초기화 ---
+    function initApp() {
+      // 네비게이션 생성
+      renderNavigation();
+      // 첫 문제 렌더링
+      loadProblem(1);
+    }
+
+    // --- 상단 네비게이션 생성 및 갱신 ---
+    function renderNavigation() {
+      const container = document.getElementById('nav-buttons-container');
+      container.innerHTML = '';
+      
+      problems.forEach(p => {
+        const btn = document.createElement('button');
+        btn.id = `nav-btn-${p.id}`;
+        btn.className = `shrink-0 w-12 h-12 rounded-full font-bold flex items-center justify-center border-2 transition-all`;
+        
+        // 문제 완료 상태나 활성화 여부에 따른 색상 변경
+        updateNavButtonClass(btn, p.id);
+        
+        btn.textContent = p.id;
+        btn.onclick = () => loadProblem(p.id);
+        container.appendChild(btn);
+      });
+    }
+
+    function updateNavButtonClass(btn, problemId) {
+      const isCurrent = currentProblemId === problemId;
+      const rec = records[problemId];
+      
+      btn.className = `shrink-0 w-12 h-12 rounded-full font-bold flex items-center justify-center border-2 transition-all `;
+      
+      if (isCurrent) {
+        btn.className += `bg-blue-600 text-white border-blue-600 scale-110`;
+      } else if (rec && rec.isCompleted) {
+        btn.className += `bg-green-100 text-green-700 border-green-300`;
+      } else {
+        btn.className += `bg-white text-gray-600 border-gray-200 hover:bg-gray-100`;
+      }
+    }
+
+    // --- 특정 문제 불러오기 ---
+    function loadProblem(problemId) {
+      currentProblemId = problemId;
+      
+      // 네비게이션 버튼들 활성화 상태 업데이트
+      problems.forEach(p => {
+        const btn = document.getElementById(`nav-btn-${p.id}`);
+        if (btn) updateNavButtonClass(btn, p.id);
+      });
+
+      const problem = problems.find(p => p.id === problemId);
+      
+      // 문제 본문 그리기
+      document.getElementById('problem-badge').textContent = `문제 ${problem.id}`;
+      document.getElementById('problem-title').textContent = problem.title;
+      document.getElementById('problem-content').innerHTML = renderMathText(problem.content);
+
+      // 난이도 버튼 초기화
+      resetDifficultyButtons();
+
+      // 기존 학습 기록이 있으면 해당 UI 자동 로드
+      const rec = records[problemId];
+      if (rec && rec.difficulty) {
+        highlightDifficultyButton(rec.difficulty);
+        renderLearningCard(rec.difficulty, problem);
+      } else {
+        document.getElementById('learning-card-container').classList.add('hidden');
+      }
+    }
+
+    // --- 난이도 제어 기능 ---
+    function resetDifficultyButtons() {
+      ['hard', 'normal', 'easy'].forEach(d => {
+        const btn = document.getElementById(`btn-diff-${d}`);
+        btn.className = btn.className.replace(/bg-\w+-500 text-white border-\w+-500/g, '');
+        // 기본 보더/텍스트 상태 복원
+        if (d === 'hard') btn.className = "flex-1 py-3 px-4 rounded-xl border-2 font-bold transition-all text-center text-red-500 border-red-200 hover:bg-red-50";
+        if (d === 'normal') btn.className = "flex-1 py-3 px-4 rounded-xl border-2 font-bold transition-all text-center text-green-600 border-green-200 hover:bg-green-50";
+        if (d === 'easy') btn.className = "flex-1 py-3 px-4 rounded-xl border-2 font-bold transition-all text-center text-yellow-600 border-yellow-200 hover:bg-yellow-50";
+      });
+    }
+
+    function highlightDifficultyButton(diff) {
+      resetDifficultyButtons();
+      const btn = document.getElementById(`btn-diff-${diff}`);
+      if (diff === 'hard') btn.className = "flex-1 py-3 px-4 rounded-xl border-2 font-bold transition-all text-center bg-red-500 text-white border-red-500";
+      if (diff === 'normal') btn.className = "flex-1 py-3 px-4 rounded-xl border-2 font-bold transition-all text-center bg-green-500 text-white border-green-500";
+      if (diff === 'easy') btn.className = "flex-1 py-3 px-4 rounded-xl border-2 font-bold transition-all text-center bg-yellow-500 text-white border-yellow-500";
+    }
+
+    function selectDifficulty(diff) {
+      const problem = problems.find(p => p.id === currentProblemId);
+      
+      // 기록이 없거나 덮어쓰기 하는 경우 상태 생성
+      if (!records[currentProblemId] || records[currentProblemId].difficulty !== diff) {
+        records[currentProblemId] = {
+          difficulty: diff,
+          isCompleted: false,
+          userNote: ''
+        };
+        // 1-3번 쉬움 스킵 처리
+        if (diff === 'easy' && problem.easySkip) {
+          records[currentProblemId].isCompleted = true;
+          records[currentProblemId].userNote = '기초 문제 스킵 처리됨';
+        }
+      }
+
+      highlightDifficultyButton(diff);
+      renderLearningCard(diff, problem);
+      
+      // 네비게이션 버튼 갱신
+      const navBtn = document.getElementById(`nav-btn-${problem.id}`);
+      if (navBtn) updateNavButtonClass(navBtn, problem.id);
+    }
+
+    // --- 각 난이도 카드 동적 생성 ---
+    function renderLearningCard(diff, problem) {
+      const container = document.getElementById('learning-card-container');
+      container.classList.remove('hidden');
+      container.innerHTML = ''; // 초기화
+
+      const rec = records[currentProblemId];
+
+      if (diff === 'hard') {
+        // --- [어려움] 단계별 풀이 카드 생성 ---
+        // 하드 스텝 상태가 존재하지 않는다면 최초 초기화
+        if (!hardStepsState[problem.id]) {
+          hardStepsState[problem.id] = problem.hard.map(() => ({
+            status: rec.isCompleted ? 'know' : null,
+            note: '',
+            isSubmitted: rec.isCompleted
+          }));
+        }
+        
+        const card = document.createElement('div');
+        card.className = "bg-red-50 border border-red-100 rounded-2xl p-6 shadow-sm animate-fade-in";
+        card.innerHTML = `
+          <h4 class="text-xl font-bold text-red-800 mb-2 flex items-center">
+            <i class="fa-solid fa-circle-check text-2xl mr-2"></i> 단계별 풀이 확인
+          </h4>
+          <p class="text-red-600 mb-6 font-medium">각 단계를 읽고 이해했는지 체크해주세요. 이해가 안 되는 부분은 선생님께 도움을 요청할 수 있습니다.</p>
+          <div id="hard-steps-list" class="space-y-4"></div>
+          <div id="hard-success-msg" class="mt-6 text-center text-red-600 font-bold text-lg hidden">해당 문제에 대한 단계별 학습이 모두 완료되었습니다.</div>
+        `;
+        container.appendChild(card);
+
+        const listContainer = document.getElementById('hard-steps-list');
+        problem.hard.forEach((stepText, idx) => {
+          const stepDiv = document.createElement('div');
+          stepDiv.className = "bg-white p-5 rounded-xl border border-red-200 shadow-sm";
+          stepDiv.innerHTML = `
+            <div class="text-lg text-gray-800 leading-relaxed mb-4">${renderMathText(stepText)}</div>
+            <div class="flex space-x-3">
+              <button id="btn-know-${idx}" onclick="setHardStepStatus(${idx}, 'know')" class="flex-1 py-2 rounded-lg font-bold transition-all bg-gray-100 text-gray-600 hover:bg-blue-100 border border-transparent">
+                💡 알고 있어요
+              </button>
+              <button id="btn-dont-${idx}" onclick="setHardStepStatus(${idx}, 'dontKnow')" class="flex-1 py-2 rounded-lg font-bold transition-all bg-gray-100 text-gray-600 hover:bg-red-100 border border-transparent">
+                🤔 이해가 안 돼요
+              </button>
+            </div>
+            <div id="dont-know-input-box-${idx}" class="mt-4 hidden">
+              <textarea id="dont-know-textarea-${idx}" class="w-full p-3 border-2 border-red-200 rounded-lg focus:border-red-500 outline-none resize-none mb-2" rows="3" placeholder="어느 부분이 이해가 안 되는지 구체적으로 적어주세요..."></textarea>
+              <button onclick="submitTeacherCall(${idx})" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg transition">선생님 호출 및 도움 요청하기</button>
+            </div>
+            <div id="teacher-call-wait-${idx}" class="mt-4 p-4 bg-red-100 text-red-800 rounded-lg text-sm font-bold border border-red-200 hidden">
+              🚨 선생님 호출 대기중 : <span id="teacher-call-text-${idx}"></span>
+            </div>
+          `;
+          listContainer.appendChild(stepDiv);
+          refreshHardStepUI(idx);
+        });
+
+        checkAndCompleteHardMode();
+
+      } else if (diff === 'normal') {
+        // --- [보통] 단계별 빈칸 채우기 카드 생성 ---
+        if (!normalInputsState[problem.id]) {
+          normalInputsState[problem.id] = problem.normal.map(step => Array(step.answers.length).fill(''));
+        }
+
+        const card = document.createElement('div');
+        card.className = "bg-green-50 border border-green-100 rounded-2xl p-6 shadow-sm animate-fade-in";
+        card.innerHTML = `
+          <h4 class="text-xl font-bold text-green-800 mb-2 flex items-center">
+            <i class="fa-solid fa-book-open text-2xl mr-2"></i> 단계별 논리 빈칸 채우기
+          </h4>
+          <p class="text-green-700 mb-6 font-medium">어려움 난이도와 동일한 단계별 풀이입니다. 흐름을 읽고 알맞은 값을 넣어 논리를 완성해보세요.</p>
+          <div id="normal-steps-list" class="space-y-4 mb-6"></div>
+          <div id="normal-action-area" class="flex items-center space-x-4">
+            <button onclick="checkNormalAnswers()" class="px-6 py-3 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-colors shadow">정답 확인</button>
+            <span id="normal-error-msg" class="text-red-500 font-bold animate-pulse hidden">틀린 빈칸이 있습니다. 다시 한 번 생각해보세요!</span>
+          </div>
+          <div id="normal-success-msg" class="text-center text-green-600 font-bold text-lg hidden">완벽하게 이해하셨네요! 모든 논리가 완성되었습니다.</div>
+        `;
+        container.appendChild(card);
+
+        const listContainer = document.getElementById('normal-steps-list');
+        problem.normal.forEach((stepData, stepIdx) => {
+          const stepDiv = document.createElement('div');
+          stepDiv.className = "bg-white p-5 rounded-xl border border-green-200 shadow-sm text-lg text-gray-800 leading-loose break-keep";
+          
+          const parts = stepData.step.split('[ ]');
+          parts.forEach((part, i) => {
+            const span = document.createElement('span');
+            span.innerHTML = renderMathText(part);
+            stepDiv.appendChild(span);
+
+            if (i < parts.length - 1) {
+              const input = document.createElement('input');
+              input.type = "text";
+              input.id = `input-${stepIdx}-${i}`;
+              input.className = "mx-2 px-2 py-1 w-24 text-center border-b-2 border-green-400 focus:outline-none focus:border-green-600 bg-green-50 text-green-900 font-bold font-mono transition-colors";
+              input.value = rec.isCompleted ? stepData.answers[i] : (normalInputsState[problem.id][stepIdx][i] || '');
+              input.disabled = rec.isCompleted;
+              input.oninput = (e) => {
+                normalInputsState[problem.id][stepIdx][i] = e.target.value;
+                document.getElementById('normal-error-msg').classList.add('hidden');
+              };
+              stepDiv.appendChild(input);
+            }
+          });
+          listContainer.appendChild(stepDiv);
+        });
+
+        if (rec.isCompleted) {
+          document.getElementById('normal-action-area').classList.add('hidden');
+          document.getElementById('normal-success-msg').classList.remove('hidden');
+        }
+
+      } else if (diff === 'easy') {
+        // --- [쉬움] 카드 생성 ---
+        if (problem.easySkip) {
+          // 1~3번 문제 스킵 UI
+          const card = document.createElement('div');
+          card.className = "bg-yellow-50 border border-yellow-100 rounded-2xl p-8 text-center shadow-sm animate-fade-in";
+          card.innerHTML = `
+            <h4 class="text-2xl font-bold text-yellow-800 mb-4">🙌 기초 문제 패스!</h4>
+            <p class="text-yellow-700 text-lg">선생님께서 이 문제는 아주 기초적인 문제라서 넘어가도록 설정하셨습니다.<br/>학습 완료 처리되었습니다. 다음 문제로 이동하세요!</p>
+          `;
+          container.appendChild(card);
+        } else {
+          // 핵심 개념 및 판단 근거 서술형 UI (4~16번)
+          const card = document.createElement('div');
+          card.className = "bg-yellow-50 border border-yellow-100 rounded-2xl p-6 shadow-sm animate-fade-in";
+          card.innerHTML = `
+            <h4 class="text-xl font-bold text-yellow-800 mb-4">핵심 개념과 판단 이유 기록하기</h4>
+            <div class="bg-white p-5 rounded-lg border border-yellow-200 text-gray-800 text-lg mb-4 font-medium leading-relaxed">
+              ${problem.easy}
+            </div>
+            <textarea id="easy-note-textarea" class="w-full h-40 p-4 border-2 border-yellow-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 text-lg resize-none mb-4" 
+              placeholder="사용된 개념은 무엇이고, 왜 그렇게 생각했는지 자유롭게 적어주세요..." ${rec.isCompleted ? 'disabled' : ''}>${rec.userNote || ''}</textarea>
+            
+            <div id="easy-action-area">
+              <button id="easy-submit-btn" onclick="submitEasyNote()" class="px-6 py-3 rounded-lg font-bold transition-colors shadow bg-yellow-500 text-white hover:bg-yellow-600">기록 완료</button>
+            </div>
+            <div id="easy-success-msg" class="text-center text-yellow-600 font-bold text-lg hidden">기록이 성공적으로 저장되었습니다.</div>
+          `;
+          container.appendChild(card);
+
+          if (rec.isCompleted) {
+            document.getElementById('easy-action-area').classList.add('hidden');
+            document.getElementById('easy-success-msg').classList.remove('hidden');
+          }
+        }
+      }
+    }
+
+    // --- [어려움] 단계 선택 및 UI 갱신 로직 ---
+    function setHardStepStatus(stepIdx, status) {
+      const rec = records[currentProblemId];
+      if (rec.isCompleted) return;
+
+      const state = hardStepsState[currentProblemId][stepIdx];
+      state.status = status;
+
+      refreshHardStepUI(stepIdx);
+      checkAndCompleteHardMode();
+    }
+
+    function refreshHardStepUI(stepIdx) {
+      const state = hardStepsState[currentProblemId][stepIdx];
+      const btnKnow = document.getElementById(`btn-know-${stepIdx}`);
+      const btnDont = document.getElementById(`btn-dont-${stepIdx}`);
+      const inputBox = document.getElementById(`dont-know-input-box-${stepIdx}`);
+      const waitBox = document.getElementById(`teacher-call-wait-${stepIdx}`);
+      const waitText = document.getElementById(`teacher-call-text-${stepIdx}`);
+
+      // 상태별 버튼 하이라이트 제어
+      if (state.status === 'know') {
+        btnKnow.className = "flex-1 py-2 rounded-lg font-bold transition-all bg-blue-500 text-white shadow-inner";
+        btnDont.className = "flex-1 py-2 rounded-lg font-bold transition-all bg-gray-100 text-gray-600 hover:bg-red-100 border border-transparent";
+        inputBox.classList.add('hidden');
+        waitBox.classList.add('hidden');
+      } else if (state.status === 'dontKnow') {
+        btnDont.className = "flex-1 py-2 rounded-lg font-bold transition-all bg-red-500 text-white shadow-inner";
+        btnKnow.className = "flex-1 py-2 rounded-lg font-bold transition-all bg-gray-100 text-gray-600 hover:bg-blue-100 border border-transparent";
+        
+        if (state.isSubmitted) {
+          inputBox.classList.add('hidden');
+          waitBox.classList.remove('hidden');
+          waitText.textContent = state.note;
+        } else {
+          inputBox.classList.remove('hidden');
+          waitBox.classList.add('hidden');
+        }
+      } else {
+        btnKnow.className = "flex-1 py-2 rounded-lg font-bold transition-all bg-gray-100 text-gray-600 hover:bg-blue-100 border border-transparent";
+        btnDont.className = "flex-1 py-2 rounded-lg font-bold transition-all bg-gray-100 text-gray-600 hover:bg-red-100 border border-transparent";
+        inputBox.classList.add('hidden');
+        waitBox.classList.add('hidden');
+      }
+    }
+
+    function submitTeacherCall(stepIdx) {
+      const ta = document.getElementById(`dont-know-textarea-${stepIdx}`);
+      const text = ta.value.trim();
+      if (!text) return;
+
+      // 교사 호출 경고 메시지 창 (알림)
+      alert("선생님을 불러주세요! 작성하신 질문을 선생님과 함께 해결해 보세요.");
+
+      const state = hardStepsState[currentProblemId][stepIdx];
+      state.note = text;
+      state.isSubmitted = true;
+
+      refreshHardStepUI(stepIdx);
+      checkAndCompleteHardMode();
+    }
+
+    function checkAndCompleteHardMode() {
+      const problemStates = hardStepsState[currentProblemId];
+      // 모든 단계가 '알고 있어요' 혹은 ('이해가 안돼요' 이면서 질문을 전송완료한 상태) 일 때 통과
+      const allDone = problemStates.every(s => s.status === 'know' || (s.status === 'dontKnow' && s.isSubmitted));
+      
+      if (allDone && problemStates.some(s => s.status !== null)) {
+        const rec = records[currentProblemId];
+        rec.isCompleted = true;
+        rec.userNote = '선생님 도움 요청 기록 있음';
+
+        document.getElementById('hard-success-msg').classList.remove('hidden');
+
+        // 네비게이션 버튼 및 UI 컴포넌트 전체 동결 갱신
+        const navBtn = document.getElementById(`nav-btn-${currentProblemId}`);
+        if (navBtn) updateNavButtonClass(navBtn, currentProblemId);
+        
+        // 각 버튼들 끄기 비활성화
+        problemStates.forEach((_, idx) => {
+          const bk = document.getElementById(`btn-know-${idx}`);
+          const bd = document.getElementById(`btn-dont-${idx}`);
+          if (bk) bk.disabled = true;
+          if (bd) bd.disabled = true;
+        });
+      }
+    }
+
+    // --- [보통] 정답 확인 알고리즘 ---
+    function checkNormalAnswers() {
+      const problem = problems.find(p => p.id === currentProblemId);
+      const userInputs = normalInputsState[problem.id];
+      let allCorrect = true;
+
+      problem.normal.forEach((stepData, stepIdx) => {
+        stepData.answers.forEach((ans, i) => {
+          const userVal = (userInputs[stepIdx][i] || '').trim().replace(/\s/g, '');
+          const correctVal = ans.trim().replace(/\s/g, '');
+          if (userVal !== correctVal) {
+            allCorrect = false;
+          }
+        });
+      });
+
+      if (allCorrect) {
+        document.getElementById('normal-error-msg').classList.add('hidden');
+        document.getElementById('normal-action-area').classList.add('hidden');
+        document.getElementById('normal-success-msg').classList.remove('hidden');
+
+        records[currentProblemId].isCompleted = true;
+        records[currentProblemId].userNote = '빈칸 채우기 논리 학습 완료';
+
+        const navBtn = document.getElementById(`nav-btn-${currentProblemId}`);
+        if (navBtn) updateNavButtonClass(navBtn, currentProblemId);
+
+        // 인풋 전체 잠금
+        problem.normal.forEach((stepData, stepIdx) => {
+          stepData.answers.forEach((_, i) => {
+            const input = document.getElementById(`input-${stepIdx}-${i}`);
+            if (input) input.disabled = true;
+          });
+        });
+      } else {
+        document.getElementById('normal-error-msg').classList.remove('hidden');
+      }
+    }
+
+    // --- [쉬움] 서술형 작성완료 기능 ---
+    function submitEasyNote() {
+      const ta = document.getElementById('easy-note-textarea');
+      const text = ta.value.trim();
+      if (!text) return;
+
+      records[currentProblemId].isCompleted = true;
+      records[currentProblemId].userNote = text;
+
+      document.getElementById('easy-action-area').classList.add('hidden');
+      document.getElementById('easy-success-msg').classList.remove('hidden');
+      ta.disabled = true;
+
+      const navBtn = document.getElementById(`nav-btn-${currentProblemId}`);
+      if (navBtn) updateNavButtonClass(navBtn, currentProblemId);
+    }
+
+    // --- 결과 보고서 렌더링 ---
+    function showReport() {
+      document.getElementById('main-screen').classList.add('hidden');
+      document.getElementById('report-screen').classList.remove('hidden');
+
+      // 개인 인포메이션 출력
+      document.getElementById('report-student-id').textContent = studentId;
+      document.getElementById('report-student-name').textContent = studentName;
+
+      const tbody = document.getElementById('report-table-body');
+      tbody.innerHTML = '';
+
+      problems.forEach((p, idx) => {
+        const rec = records[p.id];
+        const tr = document.createElement('tr');
+        tr.className = idx % 2 === 0 ? 'bg-gray-50' : 'bg-white';
+
+        let diffText = '-';
+        if (rec?.difficulty === 'hard') diffText = '어려움';
+        if (rec?.difficulty === 'normal') diffText = '보통';
+        if (rec?.difficulty === 'easy') diffText = '쉬움';
+
+        let statusText = rec?.isCompleted ? '<span class="text-green-600 font-bold">완료</span>' : '<span class="text-red-500">미완료</span>';
+
+        let comment = '<span class="text-gray-400">학습 기록 없음</span>';
+        if (rec?.difficulty === 'easy' && rec?.userNote) {
+          comment = rec.userNote;
+        } else if (rec?.difficulty === 'normal' && rec?.isCompleted) {
+          comment = '빈칸 채우기 논리 학습 완료';
+        } else if (rec?.difficulty === 'hard' && rec?.isCompleted) {
+          comment = '단계별 메타인지 및 풀이 학습 완료';
+        }
+
+        tr.innerHTML = `
+          <td class="p-4 border border-gray-300 font-bold text-center">${p.id}번</td>
+          <td class="p-4 border border-gray-300 text-center">${statusText}</td>
+          <td class="p-4 border border-gray-300 text-center font-medium">${diffText}</td>
+          <td class="p-4 border border-gray-300 text-sm whitespace-pre-wrap break-all">${comment}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // --- PDF 출력 기능 ---
+    function downloadPdf() {
+      const element = document.getElementById('report-container');
+      const opt = {
+        margin:       10,
+        filename:     `${studentName}_맞춤형_학습결과_보고서.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      html2pdf().set(opt).from(element).save();
+    }
+  </script>
+</body>
+</html>
